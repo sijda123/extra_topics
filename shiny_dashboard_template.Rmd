@@ -52,7 +52,7 @@ sliderInput(
 	inputId = "price_choice", 
 	label = h3("Choose a price range"),
 	min = min_price,
-	max = 1000, 
+	max = max_price, 
 	value = c(200, 400)
 )
 ```
@@ -80,8 +80,8 @@ renderPlotly(
 	nyc_airbnb |> 
 		filter(
 			borough == input[["borough_choice"]],
-			price <= input[["price_choice"]][2],
-			price >= input[["price_choice"]][1],
+			price <= input[["price_choice"]][2], # second element is the maximum
+			price >= input[["price_choice"]][1], # first element is the minimum
 			room_type == input[["room_choice"]]) |> 
 		plot_ly(
 			x = ~long, y = ~lat, color = ~price,
