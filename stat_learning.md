@@ -1,0 +1,221 @@
+Statistical Learning
+================
+
+Load key packages.
+
+``` r
+library(tidyverse)
+library(glmnet)
+```
+
+    ## Loading required package: Matrix
+
+    ## 
+    ## Attaching package: 'Matrix'
+
+    ## The following objects are masked from 'package:tidyr':
+    ## 
+    ##     expand, pack, unpack
+
+    ## Loaded glmnet 4.1-10
+
+``` r
+library(palmerpenguins)
+```
+
+    ## 
+    ## Attaching package: 'palmerpenguins'
+
+    ## The following objects are masked from 'package:datasets':
+    ## 
+    ##     penguins, penguins_raw
+
+``` r
+set.seed(11)
+```
+
+## Do LASSO
+
+``` r
+# data cleaning
+bwt_df = 
+  read_csv("data/birthweight.csv") |> 
+  janitor::clean_names() |>
+  mutate(
+    babysex = 
+        case_match(babysex,
+            1 ~ "male",
+            2 ~ "female"
+        ),
+    babysex = fct_infreq(babysex),
+    frace = 
+        case_match(frace,
+            1 ~ "white",
+            2 ~ "black", 
+            3 ~ "asian", 
+            4 ~ "puerto rican", 
+            8 ~ "other"),
+    frace = fct_infreq(frace),
+    mrace = 
+        case_match(mrace,
+            1 ~ "white",
+            2 ~ "black", 
+            3 ~ "asian", 
+            4 ~ "puerto rican",
+            8 ~ "other"),
+    mrace = fct_infreq(mrace),
+    malform = as.logical(malform)) |> 
+  sample_n(100)
+```
+
+    ## Rows: 4342 Columns: 20
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## dbl (20): babysex, bhead, blength, bwt, delwt, fincome, frace, gaweeks, malf...
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+Need to do some data processing.
+
+``` r
+# Lasso expects a matrix
+x = model.matrix(bwt ~ ., bwt_df)[, -1]
+# Pull out birth weight, this is the response vector
+y = bwt_df |> pull(bwt)
+```
+
+Define some lambdas and fit Lasso for each.
+
+``` r
+# Don't have to define, lasso will do it for you
+# you can define lambda as anything you want
+lambda = 10^(seq(-2, 2.75, 0.1)) # List of lambda values
+
+# glmnet fits all the lassos we care about
+# multiplying the coefficients by lambda
+# lambda says whether the coefficients are really bad or not
+# focused on prediction accuracy
+lasso_fit = 
+    glmnet(x = x, y = y, lambda = lambda)
+
+# lasso cross validation
+# 3 or 5 fold
+# Multiple training test splits
+lasso_cv = 
+    cv.glmnet(x = x, y = y, lambda = lambda)
+
+# find lambda optimal value (gives smallest cross validated root mean squared error for the outcome)
+lambda_opt = lasso_cv[["lambda.min"]]
+```
+
+There’s a lot of stuff in these.
+
+Here’s plot 1.
+
+``` r
+lasso_fit |> 
+  # in row 49 for babysexfemale when lambda value is 19 or greater, coefficient shows up as 0, penalty decreases as lambda value gets smaller
+    broom::tidy() |> 
+    select(term, lambda, estimate) |> 
+  # for every term we want an entry for every lambda so when penalty is big, fill with 0s
+    complete(term, lambda, fill = list(estimate = 0)) |>
+  # exclude intercept since it makes plot weird
+    filter(term != "(Intercept)") |> 
+    ggplot(aes(x = log(lambda, 10), y = estimate, group = term, color = term)) + 
+    geom_line() + 
+    geom_vline(xintercept = log(lambda_opt, 10))
+```
+
+<img src="stat_learning_files/figure-gfm/unnamed-chunk-6-1.png" width="90%" />
+
+``` r
+# all coefficients shrink to 0 as lambda increases
+# trying to balance coefficients and lambda
+# optimal lambda is where the vertical line is at
+```
+
+Next is plot 2.
+
+``` r
+lasso_cv |> 
+  # get standard errors and CI's
+    broom::tidy() |> 
+    ggplot(aes(x = log(lambda, 10), y = estimate)) +
+    geom_point()
+```
+
+<img src="stat_learning_files/figure-gfm/unnamed-chunk-7-1.png" width="90%" />
+
+``` r
+# not a ton of difference when lambda is small, model just keeps getting worse
+# do this instead of stepwise
+```
+
+Do lasso with the right lambda.
+
+``` r
+# only does results for the right lambda
+lasso_fit =  
+    glmnet(x = x, y = y, lambda = lambda_opt)
+```
+
+## Clustering
+
+Look at pokemon!
+
+``` r
+pokemon_df = 
+    read_csv("data/pokemon.csv") |> 
+    janitor::clean_names() |> 
+    select(hp, speed)
+```
+
+    ## Rows: 800 Columns: 13
+    ## ── Column specification ────────────────────────────────────────────────────────
+    ## Delimiter: ","
+    ## chr (3): Name, Type 1, Type 2
+    ## dbl (9): #, Total, HP, Attack, Defense, Sp. Atk, Sp. Def, Speed, Generation
+    ## lgl (1): Legendary
+    ## 
+    ## ℹ Use `spec()` to retrieve the full column specification for this data.
+    ## ℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.
+
+``` r
+pokemon_df |> 
+    ggplot(aes(x = hp, y = speed)) + 
+    geom_point()
+```
+
+<img src="stat_learning_files/figure-gfm/unnamed-chunk-10-1.png" width="90%" />
+
+Fit kmeans clustering to this dataset.
+
+``` r
+# super fast
+kmeans_fit = 
+    kmeans(x = pokemon_df, centers = 3)
+```
+
+Use `broom` to get nice results.
+
+``` r
+pokemon_df = 
+  # add predictions using broom package
+    broom::augment(kmeans_fit, pokemon_df)
+```
+
+Look at results!
+
+``` r
+pokemon_df |> 
+    ggplot(aes(x = hp, y = speed, color = .cluster)) + 
+    geom_point()
+```
+
+<img src="stat_learning_files/figure-gfm/unnamed-chunk-13-1.png" width="90%" />
+
+``` r
+# shows clusters (yellow are low hit point slow guys, green is medium hit point fast guys, blue is the high hit point slow guys)
+# these are made up clusters, may or may not be true
+```
