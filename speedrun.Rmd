@@ -39,6 +39,8 @@ Next we'll revisit some classic examples and see how we do!
 
 ## FAS Litters and Pups
 
+> Please import, clean, tidy, and merge these files.
+
 ```{r}
 library(tidyverse)
 
@@ -46,6 +48,7 @@ library(tidyverse)
 # 1. Import
 #------------------------------------------------------------
 litters_raw <- read_csv("speedrun_data/FAS_litters.csv")
+# needed to add skip and na
 pups_raw    <- read_csv("speedrun_data/FAS_pups.csv", skip = 3, na = c("", ".", "NA"))
 
 #------------------------------------------------------------
@@ -56,6 +59,7 @@ pups_raw    <- read_csv("speedrun_data/FAS_pups.csv", skip = 3, na = c("", ".", 
 litters <- 
 	litters_raw %>%
   janitor::clean_names() %>%
+  # needed to add this part
 	rename(litter_id = litter_number) |> 
   mutate(
     litter_id = str_to_lower(litter_id),
@@ -80,10 +84,13 @@ pups <- pups_raw %>%
 # - Convert categorical variables to factors
 litters <- litters %>%
   mutate(
+    # wrong column names
     gd0 = as.Date(gd0),
     gd18 = as.Date(gd18),
     group = factor(group),
+    # there is no dose column
     dose = factor(dose, ordered = TRUE)
+    # note: very minimal instructions given
   )
 
 # Pups dataset:
@@ -112,6 +119,8 @@ glimpse(fas_merged)
 ## Weather Data + EDA
 
 Import then use ChatGPT code.
+
+> This file contains data on three weather stations, and information like date, tmax, tmin, and precipitation. Please do exploratory analyses and visualizations, provide the R code to reproduce these.
 
 ```{r}
 weather = 
@@ -145,6 +154,7 @@ temperature distribution
 
 
 ```{r}
+# gives faceted distribution
 weather %>%
   pivot_longer(cols = c(tmax, tmin),
                names_to = "variable",
@@ -180,6 +190,8 @@ ggplot(weather_monthly, aes(month, mean_tmax, color = station)) +
 
 
 ## AirBNB Leaflet map
+
+> seperately, I have a dataset with airbnb rental information in NYC. this contains lat, long, price, and rating, among others. please create a leaflet map for these data, using greyscale background, circles to mark locations, and color according to price.
 
 ```{r}
 library(p8105.datasets)
@@ -227,15 +239,18 @@ leaflet(data = nyc_airbnb) %>%
     opacity = 1
   )
 
+# tells you price, rating, lat, and long
 ```
 
 
 ## Chloropleth?
 
-
+Skipped
 
 
 ## Midterm clean and EDA
+
+> I have a new dataset coming from Australian researchers describing the relationship between posture and "enlarged protuberances" especially among younger subjects. Note the first 6 rows contain codebook information, not data. Please import, clean, and organize these data. Also note any issues in the resulting data file.
 
 ```{r}
 library(tidyverse)
@@ -264,6 +279,7 @@ mtp <- mtp %>%
   mutate(
     # Convert categorical variables
     sex = case_when(
+      # used likely coding values for variables and not actual code book values
       sex %in% c("M", "Male", 1) ~ "male",
       sex %in% c("F", "Female", 2) ~ "female",
       TRUE ~ NA_character_
@@ -278,6 +294,8 @@ mtp <- mtp %>%
     # Convert dates if present
     date = suppressWarnings(ymd(date))
   )
+
+# this code was different if you ask the same prompt again
 ```
 
 
@@ -286,9 +304,13 @@ mtp <- mtp %>%
 
 Look at birthday problem
 
+> Lastly, write a simulation for the birthday problem
+
 Function
 
 ```{r}
+# wrote a function of size n
+
 birthday_sim <- function(n) {
   # Simulate n birthdays (1–365)
   bdays <- sample(1:365, size = n, replace = TRUE)
@@ -304,6 +326,7 @@ Example: 23 people
 set.seed(123)
 
 n_sims <- 10000
+# 23 people in the room
 n <- 23
 
 results <- tibble(
@@ -320,6 +343,7 @@ Do this a lot
 ```{r}
 set.seed(123)
 
+# do this for many group sizes
 group_sizes <- 2:60
 n_sims <- 5000
 
@@ -329,9 +353,11 @@ birthday_results <-
     sim = 1:n_sims
   ) %>%
   mutate(
+    # this line of code was wrong, had to fix it
     match = map_lgl(group_size, \(n) birthday_sim(n))
   ) %>%
   group_by(group_size) %>%
+  # take average across groups
   summarize(prob_match = mean(match), .groups = "drop")
 ```
 
@@ -350,5 +376,8 @@ birthday_results %>%
     y = "Probability"
   ) +
   theme_minimal(base_size = 14)
+
+# 50% probability is around group size of 23
+# way faster than sitting down and writing it
 ```
 
